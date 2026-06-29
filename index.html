@@ -98,35 +98,47 @@
                         }
                     });
 
-                    // ✅ BORDE NEGRO (grueso y visible)
+                    // Capa 1: BORDE NEGRO GRUESO (base)
                     map.addLayer({
-                        id: 'deepstate-line',
+                        id: 'deepstate-line-black',
                         type: 'line',
                         source: 'deepstate',
                         paint: {
                             'line-color': '#000000',
-                            'line-width': 4,
+                            'line-width': 6,
                             'line-opacity': 1.0
                         }
                     });
 
-                    // ✅ BORDE BLANCO FINO (para que resalte sobre fondo oscuro)
+                    // Capa 2: BORDE ROJO FLUORESCENTE (encima, más fino)
+                    map.addLayer({
+                        id: 'deepstate-line-red',
+                        type: 'line',
+                        source: 'deepstate',
+                        paint: {
+                            'line-color': '#FF0000',
+                            'line-width': 3,
+                            'line-opacity': 1.0
+                        }
+                    });
+
+                    // Capa 3: BORDE BLANCO FINO (para brillo)
                     map.addLayer({
                         id: 'deepstate-line-white',
                         type: 'line',
                         source: 'deepstate',
                         paint: {
                             'line-color': '#FFFFFF',
-                            'line-width': 1.5,
-                            'line-opacity': 0.8
+                            'line-width': 1,
+                            'line-opacity': 0.5
                         }
                     });
 
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('info').textContent =
-                        '🌍 WarWatch | ' + features.length + ' polígonos';
+                        '🌍 WarWatch | ' + features.length + ' polígonos | 🔴 Línea roja con borde negro';
 
-                    console.log('✅ DeepState dibujado');
+                    console.log('✅ DeepState dibujado (rojo + negro)');
                 });
             })
             .catch(e => {
