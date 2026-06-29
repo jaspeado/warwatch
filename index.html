@@ -57,7 +57,7 @@
 
     <script>
         // ============================================================
-        // CONFIGURACIÓN - Archivo descomprimido y filtrado
+        // CONFIGURACIÓN - Archivo descomprimido (se genera automáticamente)
         // ============================================================
         const DEEPSTATE_URL = 'https://raw.githubusercontent.com/jaspeado/firms-ukraine-tracker/main/deepstate_actual.geojson';
 
@@ -84,7 +84,7 @@
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
         // ============================================================
-        // CARGAR DEEPSTATE (directo, sin descompresión)
+        // CARGAR DEEPSTATE (SOLO BORDE, SIN RELLENO)
         // ============================================================
         fetch(DEEPSTATE_URL)
             .then(r => {
@@ -93,7 +93,7 @@
             })
             .then(geojson => {
                 const features = geojson.features || [];
-                console.log('📊 DeepState:', features.length, 'polígonos');
+                console.log('📊 DeepState:', features.length);
 
                 map.on('load', function() {
                     map.addSource('deepstate', {
@@ -104,25 +104,14 @@
                         }
                     });
 
-                    map.addLayer({
-                        id: 'deepstate-fill',
-                        type: 'fill',
-                        source: 'deepstate',
-                        paint: {
-                            'fill-color': '#FF0000',
-                            'fill-opacity': 0.5,
-                            'fill-outline-color': '#FFFFFF',
-                            'fill-outline-width': 1
-                        }
-                    });
-
+                    // ✅ SOLO BORDE (blanco, grueso, visible)
                     map.addLayer({
                         id: 'deepstate-line',
                         type: 'line',
                         source: 'deepstate',
                         paint: {
                             'line-color': '#FFFFFF',
-                            'line-width': 2,
+                            'line-width': 3,
                             'line-opacity': 1.0
                         }
                     });
@@ -131,7 +120,7 @@
                     document.getElementById('info').textContent =
                         '🌍 WarWatch | ' + features.length + ' polígonos';
 
-                    console.log('✅ DeepState dibujado correctamente');
+                    console.log('✅ DeepState dibujado (solo borde)');
                 });
             })
             .catch(e => {
