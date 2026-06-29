@@ -2,7 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>WarWatch - Línea del Frente</title>
+    <title>WarWatch - Prueba de Relleno</title>
+    <script src="https://unpkg.com/maplibre-gl@4.0.2/dist/maplibre-gl.js">
+    </script>
+    <link href="https://unpkg.com/maplibre-gl@4.0.2/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
         html, body, #map {
             width: 100%;
@@ -24,40 +27,13 @@
             z-index: 1000;
             pointer-events: none;
         }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 18px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.8);
-            padding: 20px 40px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        #loading span {
-            display: block;
-            font-size: 14px;
-            color: #aaa;
-            margin-top: 8px;
-        }
     </style>
 </head>
 <body>
-    <div id="loading">⏳ Cargando...</div>
-    <div id="info">🌍 WarWatch - Línea del Frente</div>
+    <div id="info">🧪 Prueba: Polígono manual (debería verse rojo)</div>
     <div id="map"></div>
 
-    <script src="https://unpkg.com/maplibre-gl@4.0.2/dist/maplibre-gl.js">
-    </script>
-    <link href="https://unpkg.com/maplibre-gl@4.0.2/dist/maplibre-gl.css" rel="stylesheet" />
-
     <script>
-        const DEEPSTATE_URL = 'https://raw.githubusercontent.com/jaspeado/firms-ukraine-tracker/main/deepstate_actual.geojson';
-
         const map = new maplibregl.Map({
             container: 'map',
             style: {
@@ -74,79 +50,68 @@
                 ]
             },
             center: [31.0, 48.5],
-            zoom: 6,
+            zoom: 5,
             pitch: 0
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-        fetch(DEEPSTATE_URL)
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
-            .then(geojson => {
-                const features = geojson.features || [];
-                console.log('📊 DeepState:', features.length);
+        map.on('load', function() {
+            // Polígono de prueba (un cuadrado en Ucrania)
+            const polygon = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [30.0, 48.0],
+                        [32.0, 48.0],
+                        [32.0, 49.0],
+                        [30.0, 49.0],
+                        [30.0, 48.0]
+                    ]]
+                }
+            };
 
-                map.on('load', function() {
-                    map.addSource('deepstate', {
-                        type: 'geojson',
-                        data: {
-                            type: 'FeatureCollection',
-                            features: features
-                        }
-                    });
-
-                    // Capa 1: BORDE NEGRO GRUESO (base)
-                    map.addLayer({
-                        id: 'deepstate-line-black',
-                        type: 'line',
-                        source: 'deepstate',
-                        paint: {
-                            'line-color': '#000000',
-                            'line-width': 6,
-                            'line-opacity': 1.0
-                        }
-                    });
-
-                    // Capa 2: BORDE ROJO FLUORESCENTE (encima, más fino)
-                    map.addLayer({
-                        id: 'deepstate-line-red',
-                        type: 'line',
-                        source: 'deepstate',
-                        paint: {
-                            'line-color': '#FF0000',
-                            'line-width': 3,
-                            'line-opacity': 1.0
-                        }
-                    });
-
-                    // Capa 3: BORDE BLANCO FINO (para brillo)
-                    map.addLayer({
-                        id: 'deepstate-line-white',
-                        type: 'line',
-                        source: 'deepstate',
-                        paint: {
-                            'line-color': '#FFFFFF',
-                            'line-width': 1,
-                            'line-opacity': 0.5
-                        }
-                    });
-
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('info').textContent =
-                        '🌍 WarWatch | ' + features.length + ' polígonos | 🔴 Línea roja con borde negro';
-
-                    console.log('✅ DeepState dibujado (rojo + negro)');
-                });
-            })
-            .catch(e => {
-                console.error('❌ Error:', e);
-                document.getElementById('loading').innerHTML =
-                    '❌ Error: ' + e.message + '<br><span>Reintentando...</span>';
-                setTimeout(() => location.reload(), 5000);
+            map.addSource('test', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: [polygon]
+                }
             });
+
+            // Relleno rojo
+            map.addLayer({
+                id: 'test-fill',
+                type: 'fill',
+                source: 'test',
+                paint: {
+                    'fill-color': '#FF0000',
+                    'fill-opacity': 0.7,
+                    'fill-outline-color': '#FFFFFF',
+                    'fill-outline-width': 2
+                }
+            });
+
+            // Borde blanco
+            map.addLayer({
+                id: 'test-line',
+                type: 'line',
+                source: 'test',
+                paint: {
+                    'line-color': '#FFFFFF',
+                    'line-width': 3,
+                    'line-opacity': 1.0
+                }
+            });
+
+            // Forzar capa por encima
+            map.moveLayer('test-fill', 'osm-layer');
+            map.moveLayer('test-line', 'osm-layer');
+
+            document.getElementById('info').textContent =
+                '✅ Polígono de prueba dibujado (rojo) - ¿Lo ves?';
+        });
     </script>
 </body>
 </html>
