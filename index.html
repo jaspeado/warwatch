@@ -37,7 +37,6 @@
             padding: 20px 40px;
             border-radius: 8px;
             text-align: center;
-            max-width: 80%;
         }
         #loading span {
             display: block;
@@ -45,29 +44,10 @@
             color: #aaa;
             margin-top: 8px;
         }
-        #progress {
-            width: 100%;
-            height: 4px;
-            background: #30363d;
-            border-radius: 2px;
-            margin-top: 10px;
-            overflow: hidden;
-        }
-        #progress-bar {
-            height: 100%;
-            width: 0%;
-            background: #58a6ff;
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
     </style>
 </head>
 <body>
-    <div id="loading">
-        ⏳ Cargando DeepState...
-        <span id="status">Iniciando descarga...</span>
-        <div id="progress"><div id="progress-bar"></div></div>
-    </div>
+    <div id="loading">⏳ Cargando DeepState...<span>Descargando 17 MB</span></div>
     <div id="info">🌍 WarWatch - Línea del Frente</div>
     <div id="map"></div>
 
@@ -77,22 +57,12 @@
 
     <script>
         // ============================================================
-        // 1. CONFIGURACIÓN
+        // CONFIGURACIÓN
         // ============================================================
         const DEEPSTATE_URL = 'https://raw.githubusercontent.com/cyterat/deepstate-map-data/main/deepstate-map-data.geojson.gz';
-        const statusEl = document.getElementById('status');
-        const progressBar = document.getElementById('progress-bar');
-
-        function setStatus(msg, progress = null) {
-            statusEl.textContent = msg;
-            if (progress !== null) {
-                progressBar.style.width = Math.min(100, progress) + '%';
-            }
-            console.log(msg);
-        }
 
         // ============================================================
-        // 2. MAPA
+        // MAPA
         // ============================================================
         const map = new maplibregl.Map({
             container: 'map',
@@ -117,56 +87,21 @@
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
         // ============================================================
-        // 3. CARGAR DEEPSTATE CON PROGRESO
+        // CARGAR DEEPSTATE
         // ============================================================
-
-        // Cargar pako para descomprimir
-        setStatus('Cargando librería de descompresión...');
-        const pakoScript = document.createElement('script');
-        pakoScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js';
-        pakoScript.onload = function() {
-            setStatus('Librería cargada, descargando DeepState...', 10);
-            
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js';
+        script.onload = function() {
             fetch(DEEPSTATE_URL)
-                .then(r => {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                    const total = parseInt(r.headers.get('content-length') || '0');
-                    let loaded = 0;
-                    
-                    const reader = r.body.getReader();
-                    const chunks = [];
-                    
-                    function read() {
-                        return reader.read().then(({ done, value }) => {
-                            if (done) return chunks;
-                            loaded += value.length;
-                            if (total > 0) {
-                                const pct = 10 + (loaded / total) * 80;
-                                setStatus(`Descargando... ${Math.round(pct)}%`, pct);
-                            }
-                            chunks.push(value);
-                            return read();
-                        });
-                    }
-                    
-                    return read().then(chunks => {
-                        const buffer = chunks.reduce((acc, chunk) => {
-                            const newAcc = new Uint8Array(acc.length + chunk.length);
-                            newAcc.set(acc);
-                            newAcc.set(chunk, acc.length);
-                            return newAcc;
-                        }, new Uint8Array(0));
-                        return buffer;
-                    });
-                })
+                .then(r => r.arrayBuffer())
                 .then(buffer => {
-                    setStatus('Descomprimiendo datos...', 92);
-                    const data = pako.ungzip(buffer, { to: 'string' });
+                    // Descomprimir
+                    const data = pako.ungzip(new Uint8Array(buffer), { to: 'string' });
                     const geojson = JSON.parse(data);
                     const features = geojson.features || [];
                     console.log('📊 DeepState:', features.length, 'polígonos');
-                    
-                    // Obtener fecha más reciente
+
+                    // Obtener la fecha más reciente
                     const fechas = new Set();
                     features.forEach(f => {
                         const d = f.properties?.date || '';
@@ -175,14 +110,12 @@
                     const fechasOrdenadas = Array.from(fechas).sort();
                     const ultimaFecha = fechasOrdenadas[fechasOrdenadas.length - 1] || '';
                     console.log('📅 Última fecha:', ultimaFecha);
-                    
+
                     const filtered = features.filter(f =>
                         (f.properties?.date || '') === ultimaFecha
                     );
                     console.log('📊 Polígonos para', ultimaFecha, ':', filtered.length);
-                    
-                    setStatus(`Dibujando ${filtered.length} polígonos...`, 96);
-                    
+
                     map.on('load', function() {
                         map.addSource('deepstate', {
                             type: 'geojson',
@@ -191,7 +124,7 @@
                                 features: filtered
                             }
                         });
-                        
+
                         map.addLayer({
                             id: 'deepstate-fill',
                             type: 'fill',
@@ -203,7 +136,7 @@
                                 'fill-outline-width': 1
                             }
                         });
-                        
+
                         map.addLayer({
                             id: 'deepstate-line',
                             type: 'line',
@@ -214,23 +147,22 @@
                                 'line-opacity': 1.0
                             }
                         });
-                        
+
                         document.getElementById('loading').style.display = 'none';
                         document.getElementById('info').textContent =
                             '🌍 WarWatch | ' + filtered.length + ' polígonos | ' + ultimaFecha;
-                        
-                        setStatus('✅ Completado', 100);
+
                         console.log('✅ DeepState dibujado correctamente');
                     });
                 })
                 .catch(e => {
                     console.error('❌ Error:', e);
                     document.getElementById('loading').innerHTML =
-                        '❌ Error: ' + e.message + '<br><span>Reintentando en 5 segundos...</span>';
+                        '❌ Error: ' + e.message + '<br><span>Reintentando...</span>';
                     setTimeout(() => location.reload(), 5000);
                 });
         };
-        document.head.appendChild(pakoScript);
+        document.head.appendChild(script);
     </script>
 </body>
 </html>
