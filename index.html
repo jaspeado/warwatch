@@ -47,7 +47,7 @@
     </style>
 </head>
 <body>
-    <div id="loading">⏳ Cargando DeepState...<span>Descargando 17 MB</span></div>
+    <div id="loading">⏳ Cargando...</div>
     <div id="info">🌍 WarWatch - Línea del Frente</div>
     <div id="map"></div>
 
@@ -57,13 +57,10 @@
 
     <script>
         // ============================================================
-        // CONFIGURACIÓN
+        // CONFIGURACIÓN - Archivo descomprimido y filtrado
         // ============================================================
-        const DEEPSTATE_URL = 'https://raw.githubusercontent.com/cyterat/deepstate-map-data/main/deepstate-map-data.geojson.gz';
+        const DEEPSTATE_URL = 'https://raw.githubusercontent.com/jaspeado/firms-ukraine-tracker/main/deepstate_actual.geojson';
 
-        // ============================================================
-        // MAPA
-        // ============================================================
         const map = new maplibregl.Map({
             container: 'map',
             style: {
@@ -87,122 +84,62 @@
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
         // ============================================================
-        // FUNCIÓN PARA SIMPLIFICAR POLÍGONOS
+        // CARGAR DEEPSTATE (directo, sin descompresión)
         // ============================================================
-        function simplifyPolygon(coordinates, tolerance = 0.001) {
-            // Simplificación básica: reducir puntos
-            if (!coordinates || coordinates.length === 0) return coordinates;
-            if (coordinates.length < 10) return coordinates;
-            
-            const simplified = [];
-            const step = Math.max(1, Math.floor(coordinates.length / 50));
-            for (let i = 0; i < coordinates.length; i += step) {
-                simplified.push(coordinates[i]);
-            }
-            // Asegurar que el último punto se incluye
-            if (simplified[simplified.length - 1] !== coordinates[coordinates.length - 1]) {
-                simplified.push(coordinates[coordinates.length - 1]);
-            }
-            return simplified;
-        }
+        fetch(DEEPSTATE_URL)
+            .then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(geojson => {
+                const features = geojson.features || [];
+                console.log('📊 DeepState:', features.length, 'polígonos');
 
-        function simplifyFeature(feature) {
-            if (!feature.geometry) return feature;
-            const geom = feature.geometry;
-            if (geom.type === 'Polygon') {
-                geom.coordinates = geom.coordinates.map(ring => simplifyPolygon(ring));
-            } else if (geom.type === 'MultiPolygon') {
-                geom.coordinates = geom.coordinates.map(polygon => 
-                    polygon.map(ring => simplifyPolygon(ring))
-                );
-            }
-            return feature;
-        }
-
-        // ============================================================
-        // CARGAR DEEPSTATE
-        // ============================================================
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js';
-        script.onload = function() {
-            fetch(DEEPSTATE_URL)
-                .then(r => r.arrayBuffer())
-                .then(buffer => {
-                    const data = pako.ungzip(new Uint8Array(buffer), { to: 'string' });
-                    const geojson = JSON.parse(data);
-                    let features = geojson.features || [];
-                    console.log('📊 DeepState original:', features.length, 'polígonos');
-
-                    // Obtener la fecha más reciente
-                    const fechas = new Set();
-                    features.forEach(f => {
-                        const d = f.properties?.date || '';
-                        if (d) fechas.add(d);
+                map.on('load', function() {
+                    map.addSource('deepstate', {
+                        type: 'geojson',
+                        data: {
+                            type: 'FeatureCollection',
+                            features: features
+                        }
                     });
-                    const fechasOrdenadas = Array.from(fechas).sort();
-                    const ultimaFecha = fechasOrdenadas[fechasOrdenadas.length - 1] || '';
-                    console.log('📅 Última fecha:', ultimaFecha);
 
-                    // Filtrar por fecha
-                    features = features.filter(f =>
-                        (f.properties?.date || '') === ultimaFecha
-                    );
-                    console.log('📊 Polígonos para', ultimaFecha, ':', features.length);
-
-                    // SIMPLIFICAR polígonos (reducir puntos)
-                    features = features.map(simplifyFeature);
-                    console.log('📊 Polígonos simplificados');
-
-                    map.on('load', function() {
-                        map.addSource('deepstate', {
-                            type: 'geojson',
-                            data: {
-                                type: 'FeatureCollection',
-                                features: features
-                            }
-                        });
-
-                        // SOLO BORDE (más ligero y visible)
-                        map.addLayer({
-                            id: 'deepstate-line',
-                            type: 'line',
-                            source: 'deepstate',
-                            paint: {
-                                'line-color': '#FF0000',
-                                'line-width': 3,
-                                'line-opacity': 1.0,
-                                'line-dasharray': [2, 2]
-                            }
-                        });
-
-                        // Relleno con opacidad baja
-                        map.addLayer({
-                            id: 'deepstate-fill',
-                            type: 'fill',
-                            source: 'deepstate',
-                            paint: {
-                                'fill-color': '#FF0000',
-                                'fill-opacity': 0.2,
-                                'fill-outline-color': '#FFFFFF',
-                                'fill-outline-width': 1
-                            }
-                        });
-
-                        document.getElementById('loading').style.display = 'none';
-                        document.getElementById('info').textContent =
-                            '🌍 WarWatch | ' + features.length + ' polígonos | ' + ultimaFecha;
-
-                        console.log('✅ DeepState dibujado correctamente');
+                    map.addLayer({
+                        id: 'deepstate-fill',
+                        type: 'fill',
+                        source: 'deepstate',
+                        paint: {
+                            'fill-color': '#FF0000',
+                            'fill-opacity': 0.5,
+                            'fill-outline-color': '#FFFFFF',
+                            'fill-outline-width': 1
+                        }
                     });
-                })
-                .catch(e => {
-                    console.error('❌ Error:', e);
-                    document.getElementById('loading').innerHTML =
-                        '❌ Error: ' + e.message + '<br><span>Reintentando...</span>';
-                    setTimeout(() => location.reload(), 5000);
+
+                    map.addLayer({
+                        id: 'deepstate-line',
+                        type: 'line',
+                        source: 'deepstate',
+                        paint: {
+                            'line-color': '#FFFFFF',
+                            'line-width': 2,
+                            'line-opacity': 1.0
+                        }
+                    });
+
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('info').textContent =
+                        '🌍 WarWatch | ' + features.length + ' polígonos';
+
+                    console.log('✅ DeepState dibujado correctamente');
                 });
-        };
-        document.head.appendChild(script);
+            })
+            .catch(e => {
+                console.error('❌ Error:', e);
+                document.getElementById('loading').innerHTML =
+                    '❌ Error: ' + e.message + '<br><span>Reintentando...</span>';
+                setTimeout(() => location.reload(), 5000);
+            });
     </script>
 </body>
 </html>
